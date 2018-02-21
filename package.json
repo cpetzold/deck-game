@@ -1,0 +1,27 @@
+{
+  "name": "deck-web",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "next",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "babel-plugin-inline-dotenv": "^1.1.2",
+    "colyseus.js": "^0.8.2",
+    "express": "^4.16.2",
+    "lodash": "^4.17.4",
+    "next": "latest",
+    "next-routes": "^1.0.27",
+    "prop-types": "^15.5.10",
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0",
+    "react-json-tree": "^0.11.0",
+    "react-no-ssr": "^1.1.0"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "webpack": "^3.11.0"
+  }
+}
