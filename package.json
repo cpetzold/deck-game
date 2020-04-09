@@ -1,27 +1,32 @@
 {
-  "name": "deck-web",
+  "name": "deck-game",
   "version": "0.0.1",
   "scripts": {
-    "dev": "next",
-    "build": "next build",
-    "start": "next start"
+    "dev": "nodemon | pino-pretty -t 'SYS:h:MM:ss TT'",
+    "build": "next build && tsc --project tsconfig.server.json",
+    "start": "NODE_ENV=production node dist/index.js"
   },
   "dependencies": {
-    "babel-plugin-inline-dotenv": "^1.1.2",
-    "colyseus.js": "^0.8.2",
-    "express": "^4.16.2",
-    "lodash": "^4.17.4",
-    "next": "^5.0.0",
-    "next-routes": "^1.0.27",
-    "prop-types": "^15.5.10",
-    "react": "^16.2.0",
-    "react-dom": "^16.2.0",
-    "react-json-tree": "^0.11.0",
-    "react-no-ssr": "^1.1.0"
+    "colyseus": "^0.12.6",
+    "colyseus.js": "^0.12.2",
+    "lodash": "^4.17.15",
+    "next": "^9.3.4",
+    "pino": "^6.1.1",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "react-json-tree": "^0.11.2"
   },
-  "author": "",
+  "author": "Conner Petzold",
   "license": "ISC",
   "devDependencies": {
-    "webpack": "^3.11.0"
+    "@types/lodash": "^4.14.149",
+    "@types/node": "^13.11.0",
+    "@types/pino": "^5.17.0",
+    "@types/react": "^16.9.32",
+    "@types/react-json-tree": "^0.6.11",
+    "nodemon": "^2.0.2",
+    "pino-pretty": "^4.0.0",
+    "ts-node": "^8.8.2",
+    "typescript": "^3.8.3"
   }
 }
