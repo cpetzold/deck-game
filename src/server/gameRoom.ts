@@ -14,6 +14,9 @@ export default class GameRoom extends Room<State> {
     this.log = log.child({ roomId, roomName });
     this.log.info("Room Initialized");
     this.setState(new State(this.log));
+
+    // TODO: Don't autoDispose once proper room management is in place
+    this.autoDispose = true;
   }
 
   onAuth(client: Client) {
@@ -25,7 +28,7 @@ export default class GameRoom extends Room<State> {
   }
 
   onJoin(client: Client) {
-    this.log.info({ client }, "Client joined");
+    this.log.info({ clientId: client.id }, "Client joined");
     this.state.addPlayer(client);
 
     if (this.state.gameState !== GameState.Waiting) {
@@ -34,12 +37,12 @@ export default class GameRoom extends Room<State> {
   }
 
   onLeave(client: Client) {
-    this.log.info({ client }, "Client left");
+    this.log.info({ clientId: client.id }, "Client left");
     // this.state.removePlayer(client)
   }
 
   onMessage(client: Client, data: any) {
-    this.log.info({ client, data }, "Client sent message");
+    this.log.info({ clientId: client.id, data }, "Client sent message");
 
     const { command, args } = data;
 
