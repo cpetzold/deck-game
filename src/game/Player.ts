@@ -1,8 +1,9 @@
-import Card, { CardID } from "./Card";
+import { ArraySchema, Schema, type } from "@colyseus/schema";
 
+import Card from "./Card";
+import CardPile from "./CardPile";
 import State from "./State";
 import _ from "lodash";
-import { nosync } from "colyseus";
 
 export type PlayerID = string;
 
@@ -21,23 +22,42 @@ interface RequiredActionPayload extends RequiredAction {
   onResponse(args: any): void;
 }
 
-export default class Player {
+export default class Player extends Schema {
+  @type("string")
   public id: PlayerID;
-  public requiredActions: RequiredActionPayload[] = [];
-  public health: number = 30;
-  public armor: number = 0;
-  public actions: number = 0;
-  public buys: number = 0;
-  public coins: number = 0;
-  public deck: CardID[] = [];
-  public hand: CardID[] = [];
-  public discard: CardID[] = [];
-  public inPlay: CardID[] = [];
 
-  @nosync
+  @type("uint16")
+  public health: number = 30;
+
+  @type("uint16")
+  public armor: number = 0;
+
+  @type("uint16")
+  public actions: number = 0;
+
+  @type("uint16")
+  public buys: number = 0;
+
+  @type("uint16")
+  public coins: number = 0;
+
+  @type([Card])
+  public deck = new ArraySchema<Card>();
+
+  @type([Card])
+  public hand = new ArraySchema<Card>();
+
+  @type([Card])
+  public discard = new ArraySchema<Card>();
+
+  @type([Card])
+  public inPlay = new ArraySchema<Card>();
+
+  public requiredActions: RequiredActionPayload[] = [];
   currentRequiredActionsId: number = 0;
 
   constructor(id: PlayerID) {
+    super();
     this.id = id;
   }
 
@@ -50,13 +70,9 @@ export default class Player {
   }
 
   public cleanup(): void {
-    this.discard = [
-      ..._.clone(this.inPlay).reverse(),
-      ...this.hand,
-      ...this.discard,
-    ];
-    this.hand = [];
-    this.inPlay = [];
+    this.discard.unshift(...[..._.clone(this.inPlay).reverse(), ...this.hand]);
+    this.hand = new ArraySchema();
+    this.inPlay = new ArraySchema();
 
     this.actions = 1;
     this.buys = 1;
@@ -64,17 +80,17 @@ export default class Player {
     this.drawCards(5);
   }
 
-  public gainCard(pile: CardID[], toDeck: boolean = false): boolean {
-    if (pile.length === 0) {
+  public gainCard(pile: CardPile, toDeck: boolean = false): boolean {
+    if (pile.cards.length === 0) {
       return false;
     }
 
-    (toDeck ? this.deck : this.discard).unshift(pile.shift());
+    (toDeck ? this.deck : this.discard).unshift(pile.cards.shift());
     return true;
   }
 
   public gainCards(
-    pile: CardID[],
+    pile: CardPile,
     amount: number,
     toDeck: boolean = false
   ): boolean {
@@ -87,10 +103,12 @@ export default class Player {
   }
 
   public shuffle(): void {
-    this.deck = _([...this.deck, ...this.discard])
-      .shuffle()
-      .value();
-    this.discard = [];
+    this.deck = new ArraySchema(
+      ..._([...this.deck, ...this.discard])
+        .shuffle()
+        .value()
+    );
+    this.discard = new ArraySchema();
   }
 
   public drawCard(): boolean {
@@ -116,37 +134,29 @@ export default class Player {
     return true;
   }
 
-  getCardInHand(state: State, index: number): Card {
-    return state.cards[this.hand[index]];
-  }
-
-  canPlayCard(card: Card): boolean {
-    return (card && !card.action) || this.actions > 0;
-  }
-
   public async playCard(state: State, index: number): Promise<boolean> {
-    const card = this.getCardInHand(state, index);
+    const card = this.hand[index];
 
-    if (!this.canPlayCard(card)) return false;
+    if (!card.canPlay(state)) {
+      return false;
+    }
 
-    this.inPlay.push(card.id);
+    console.log("!!!", card.id);
+
+    this.inPlay.push(card);
+
+    console.log(this.inPlay[0].id);
+
     _.pullAt(this.hand, index);
 
-    if (card.action) {
-      this.actions--;
-      await card.action(this, state);
-    }
-
-    if (card.coin) {
-      this.coins += card.coin(this, state);
-    }
+    await card.play(state);
 
     return true;
   }
 
-  public buyCard(state: State, cardId: CardID): boolean {
-    const pile = state.cardPiles[cardId];
-    const card = state.cards[cardId];
+  public buyCard(state: State, pileId: string): boolean {
+    const pile: CardPile = state.cardPiles[pileId];
+    const card = _.first(pile.cards);
     const { cost } = card;
 
     if (!this.buys || this.coins < cost) {
@@ -158,7 +168,7 @@ export default class Player {
     this.gainCard(pile);
   }
 
-  public trashCards(indices: number[], fromDiscard: boolean = false): CardID[] {
+  public trashCards(indices: number[], fromDiscard: boolean = false): Card[] {
     return _.remove(fromDiscard ? this.discard : this.hand, (val, i) =>
       _.includes(indices, i)
     );

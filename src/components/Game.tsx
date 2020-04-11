@@ -3,6 +3,7 @@ import * as React from "react";
 import { Client, Room } from "colyseus.js";
 
 import JSONTree from "react-json-tree";
+import { State } from "../generated/State";
 import _ from "lodash";
 
 function Badge({ size = 20, color, textColor = "white", children }) {
@@ -85,9 +86,11 @@ function PlayableCard({ card, index, onClick }) {
   );
 }
 
-function CardPile({ card, count, onClick }) {
+function CardPile({ pile, onClick }) {
+  const card = _.first(pile.cards);
+  const count = pile.cards.length;
   return (
-    <div className="card-pile" onClick={() => onClick(card.id)}>
+    <div className="card-pile" onClick={() => onClick("copper")}>
       <div className="count">
         <Badge color="red">{count}</Badge>
       </div>
@@ -134,14 +137,21 @@ function useRoom(name: string) {
   const [loading, setLoading] = React.useState(true);
   const [sessionId, setSessionId] = React.useState(null);
   const [state, setState] = React.useState(null);
+  const [lastChangedAt, setLastChangedAt] = React.useState(null);
 
   const room = React.useRef<Room>();
 
   React.useEffect(() => {
     (async () => {
-      const r = await client.joinOrCreate(name);
+      const r = await client.joinOrCreate<State>(name);
 
-      r.onStateChange(setState);
+      r.onStateChange((updatedState) => {
+        console.log(
+          updatedState?.players?.[updatedState.currentPlayerId]?.inPlay
+        );
+        setState(updatedState);
+        setLastChangedAt(Date.now());
+      });
       room.current = r;
 
       setSessionId(r.sessionId);
@@ -164,9 +174,19 @@ function useRoom(name: string) {
 export default function Game({ roomName, debug = false }) {
   const { loading, state, sessionId, send } = useRoom(roomName);
 
-  if (loading || !state || state.gameState === "waiting") return null;
+  if (loading || !state) return null;
 
-  const { playing, players, cardPiles, cards, currentPlayerId } = state;
+  const { gameState, players, cardPiles, currentPlayerId } = state;
+
+  if (gameState === "waiting") {
+    return (
+      <div>
+        Waiting...
+        <JSONTree data={state} />
+      </div>
+    );
+  }
+
   const opponentId = _(players).keys().without(sessionId).first();
   const me = players[sessionId];
   const opponent = players[opponentId];
@@ -185,15 +205,14 @@ export default function Game({ roomName, debug = false }) {
   };
 
   const renderHand = ({ hand }, showCards) => {
-    const { cards } = state;
     return (
       <div className="hand">
-        {hand.map((cardId, index) =>
+        {hand.map((card, index) =>
           showCards ? (
             <PlayableCard
               key={index}
               index={index}
-              card={cards[cardId]}
+              card={card}
               onClick={onClickHandCard}
             />
           ) : (
@@ -224,9 +243,9 @@ export default function Game({ roomName, debug = false }) {
   const renderInPlay = ({ inPlay }) => {
     return (
       <div className="in-play">
-        {inPlay.map((cardId, index) => (
-          <div className="card-in-play" key={`${cardId}-${index}`}>
-            <Card card={cards[cardId]} />
+        {inPlay.map((card, index) => (
+          <div className="card-in-play" key={`${card.id}-${index}`}>
+            <Card card={card} />
           </div>
         ))}
 
@@ -274,12 +293,7 @@ export default function Game({ roomName, debug = false }) {
       <div className="game">
         <div className="piles">
           {_.map(cardPiles, (pile, cardId) => (
-            <CardPile
-              key={cardId}
-              card={cards[cardId]}
-              count={pile.length}
-              onClick={onClickPile}
-            />
+            <CardPile key={cardId} pile={pile} onClick={onClickPile} />
           ))}
         </div>
 

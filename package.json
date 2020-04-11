@@ -4,9 +4,11 @@
   "scripts": {
     "dev": "nodemon | pino-pretty -t 'SYS:h:MM:ss TT'",
     "build": "next build && tsc --project tsconfig.server.json",
-    "start": "NODE_ENV=production node dist/index.js"
+    "start": "NODE_ENV=production node dist/index.js",
+    "generate-types": " schema-codegen src/game/State.ts --output src/generated/ --ts"
   },
   "dependencies": {
+    "@colyseus/schema": "^0.5.36",
     "colyseus": "^0.12.6",
     "colyseus.js": "^0.12.2",
     "lodash": "^4.17.15",

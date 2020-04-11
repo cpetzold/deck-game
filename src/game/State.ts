@@ -1,11 +1,13 @@
-import * as cards from "./cards";
-
-import Card, { CardID } from "./Card";
-import { Client, nosync } from "colyseus";
+import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
 import Player, { PlayerID } from "./Player";
 
+import Action from "./Action";
+import Card from "./Card";
+import CardPile from "./CardPile";
+import { Client } from "colyseus";
 import { Logger } from "pino";
 import _ from "lodash";
+import cards from "./cards";
 
 export enum GameState {
   Waiting = "waiting",
@@ -13,33 +15,46 @@ export enum GameState {
   Ended = "ended",
 }
 
-export default class State {
-  @nosync
+export default class State extends Schema {
   log: Logger;
 
+  @type("string")
   public gameState: GameState = GameState.Waiting;
+
+  @type("string")
   public currentPlayerId: PlayerID;
-  public players: { [id: string]: Player } = {};
-  public cardPiles: { [id: string]: CardID[] } = {};
-  public trash: CardID[] = [];
-  public cards: { [id: string]: Card } = cards;
+
+  @type({ map: Player })
+  public players = new MapSchema<Player>();
+
+  @type({ map: CardPile })
+  public cardPiles = new MapSchema<CardPile>();
+
+  @type([Card])
+  public trash = new ArraySchema<Card>();
+
+  actionQueue: Action[] = [];
 
   constructor(log: Logger) {
+    super();
+
     this.log = log.child({});
 
-    this.addPile(cards.copper.id, 40);
-    this.addPile(cards.silver.id, 40);
-    this.addPile(cards.gold.id, 40);
+    this.addPile("copper", 40);
+    // this.addPile("silver", 40);
+    // this.addPile("gold", 40);
 
-    this.addPile(cards.lightAttack.id, 10);
-    this.addPile(cards.mediumAttack.id, 10);
-    this.addPile(cards.heavyAttack.id, 10);
+    // this.addPile("lightAttack", 10);
+    // this.addPile("mediumAttack", 10);
+    // this.addPile("heavyAttack", 10);
 
-    _(cards)
-      .filter((card) => card.isKingdom)
-      .shuffle()
-      .take(10)
-      .forEach(({ id }) => this.addPile(id));
+    // _(cards)
+    //   .filter((CardConstructor: typeof Card) => CardConstructor.isKingdom)
+    //   .shuffle()
+    //   .take(10)
+    //   .forEach((CardConstructor: typeof Card) => {
+    //     this.addPile(CardConstructor);
+    //   });
   }
 
   public addPlayer(client: Client): void {
@@ -49,8 +64,8 @@ export default class State {
     }
 
     const player: Player = new Player(client.id);
-    player.gainCards(this.cardPiles[cards.copper.id], 7);
-    player.gainCards(this.cardPiles[cards.lightAttack.id], 3);
+    player.gainCards(this.cardPiles.copper, 7);
+    // player.gainCards(this.cardPiles.lightAttack, 3);
     player.cleanup();
     this.players[client.id] = player;
 
@@ -100,8 +115,10 @@ export default class State {
     this.gameState = GameState.Ended;
   }
 
-  public addPile(cardId: CardID, amount: number = 10): void {
-    this.cardPiles[cardId] = _.fill(Array(amount), cardId);
+  public addPile(cardId: string, amount: number = 10): void {
+    this.cardPiles[cardId] = new CardPile(
+      _.times(amount, () => new cards[cardId]())
+    );
   }
 
   public async playCard(client: Client, index: number): Promise<void> {
@@ -115,7 +132,7 @@ export default class State {
     }
   }
 
-  public buyCard(client: Client, cardId: CardID): void {
+  public buyCard(client: Client, cardId: string): void {
     const player = this.players[client.id];
     if (!this.isCurrentPlayer(player)) return;
 
@@ -134,5 +151,9 @@ export default class State {
   public onRequiredActionResponse(client: Client, id: number, args: any): void {
     const player = this.players[client.id];
     player.onRequiredActionResponse(id, args);
+  }
+
+  public enqueueAction(action: Action): void {
+    this.actionQueue.push(action);
   }
 }
